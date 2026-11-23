@@ -5,6 +5,8 @@ const { spawn } = require('node:child_process')
 const sharp = require('sharp')
 const media = require('../shared/media-formats.json')
 
+if (process.platform === 'win32') sharp.cache({ files: 0 })
+
 const images = ['png', 'jpg', 'webp', 'avif', 'bmp', 'tiff', 'gif']
 const imageOutputs = ['png', 'jpg', 'jpeg', 'webp', 'avif', 'bmp', 'tiff', 'tif', 'gif']
 const extensions = (group) => Object.entries(group).flatMap(([name, entry]) => [name, ...(entry.aliases ?? [])])
@@ -95,6 +97,7 @@ function encodeMedia(input, source, target, output, executable) {
   const mappings = audioOnly ? ['-map', '0:a:0', '-vn'] : ['-map', '0:v:0', ...(silentOutput ? ['-an'] : ['-map', '0:a:0?'])]
   const inputOptions = typeof origin.input === 'string'
     ? ['-f', origin.input] : ['-format_whitelist', origin.input.join(',')]
+  if (origin.decoder) inputOptions.push('-c:a', origin.decoder)
   let options
   if (audioOnly) options = targetAudio ? audioOptions(destination) : [...aac, ...(destination.args ?? [])]
   else options = ['-vf', destination.filter ?? 'pad=ceil(iw/2)*2:ceil(ih/2)*2', ...videoPresets[destination.preset], ...(destination.args ?? [])]
@@ -171,7 +174,7 @@ async function convertFile(input, target, destination, executable) {
     else await encodeMedia(input, source, target, output, executable)
     return await saveWithoutOverwrite(output, destination, path.parse(input).name, target)
   } finally {
-    await rm(temporary, { recursive: true, force: true }).catch(() => {})
+    await rm(temporary, { recursive: true, force: true, maxRetries: 3 }).catch(() => {})
   }
 }
 

@@ -22,7 +22,7 @@
     "oga":  { "input": "ogg", "mux": "oga", "codec": "libvorbis", "args": ["-q:a", "5"] },
     "opus": { "input": "ogg", "mux": "opus", "codec": "libopus", "args": ["-b:a", "96k", "-ar", "48000"] },
     "sbc":  { "input": "sbc", "mux": "sbc", "codec": "sbc", "args": ["-ar", "48000", "-ac", "2"] },
-    "spx":  { "input": "ogg", "mux": "spx", "codec": "libspeex", "args": ["-ar", "16000", "-ac", "1"] },
+    "spx":  { "input": "ogg", "decoder": "libspeex", "mux": "spx", "codec": "libspeex", "args": ["-ar", "16000", "-ac", "1"] },
     "tta":  { "input": "tta", "mux": "tta", "codec": "tta" },
     "voc":  { "input": "voc", "mux": "voc", "codec": "pcm_u8", "args": ["-ar", "22050", "-ac", "1"] },
     "wma":  { "input": "asf", "mux": "asf", "codec": "wmav2", "args": ["-b:a", "160k", "-ar", "44100", "-ac", "2"] },

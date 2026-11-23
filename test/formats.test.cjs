@@ -116,7 +116,7 @@ async function verifyOutput(file, source, target) {
 test('image and original media combinations produce decodable media', async (t) => {
   for (const extension of fixtures) assert.ok(supported.includes(extension), extension)
   const folder = await mkdtemp(path.join(tmpdir(), 'reformato-matrix-'))
-  t.after(() => rm(folder, { recursive: true, force: true }))
+  t.after(() => rm(folder, { recursive: true, force: true, maxRetries: 4 }))
   const destination = path.join(folder, 'outputs')
   await mkdir(destination)
   let total = 0

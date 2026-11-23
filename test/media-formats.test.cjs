@@ -110,9 +110,11 @@ test('handles raw M4V and normalizes audio layout and timing for AAC and DV', as
   t.after(() => rm(folder, { recursive: true, force: true }))
   const { sound, clip } = await generateReference(folder)
   for (const extension of ['sbc', 'spx', 'tta']) {
-    const input = path.join(folder, await convertFile(sound, extension, folder))
-    const output = path.join(folder, await convertFile(input, 'aac', folder))
-    assert.deepEqual((await decode(output)).audio, ['aac'])
+    await t.test(`${extension} → AAC`, async () => {
+      const input = path.join(folder, await convertFile(sound, extension, folder))
+      const output = path.join(folder, await convertFile(input, 'aac', folder))
+      assert.deepEqual((await decode(output)).audio, ['aac'])
+    })
   }
   for (const extension of ['webm', 'ogv', 'wmv']) {
     const input = path.join(folder, await convertFile(clip, extension, folder))
