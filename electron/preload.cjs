@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('reformato', {
   removeFile: (id) => ipcRenderer.invoke('files:remove', id),
   chooseDestination: (current) => ipcRenderer.invoke('destination:choose', current),
   openDestination: () => ipcRenderer.invoke('destination:open'),
-  convert: (jobs, outputFolder) => ipcRenderer.invoke('conversion:start', { jobs, outputFolder }),
+  convert: (jobs, outputFolder, videoProfile) => ipcRenderer.invoke('conversion:start', { jobs, outputFolder, videoProfile }),
   onProgress: (callback) => subscribe('conversion:progress', callback),
   engineStatus: () => ipcRenderer.invoke('engine:status'),
   installEngine: () => ipcRenderer.invoke('engine:install'),

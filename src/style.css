@@ -125,6 +125,11 @@ h1 { font-size: clamp(32px, 5vw, 54px); letter-spacing: -.068em; line-height: 1.
 .field .select-wrap, .output-action > button { width: 100%; }
 .output-action { margin-top: auto; border-top: 1px solid var(--line); padding-top: 15px; }
 .action-hint { display: block; text-align: center; }
+.conversion-meter { display: grid; gap: 5px; margin-top: 9px; font-size: 12px; color: var(--muted); }
+.conversion-meter > div { display: flex; justify-content: space-between; gap: 6px; }
+.conversion-meter strong { color: var(--ink); }
+.conversion-meter small:empty { display: none; }
+.conversion-meter progress { width: 100%; height: 8px; accent-color: var(--accent); }
 .button, .icon-button, .text-button { display: inline-flex; justify-content: center; align-items: center; gap: 7px; border: 1px solid transparent; background: transparent; text-decoration: none; transition: background .15s, border-color .15s, transform .15s; }
 .button { min-height: 42px; padding: 0 13px; border-radius: 8px; font-size: 13px; font-weight: 650; }
 .button:hover:not(:disabled), .icon-button:hover:not(:disabled) { transform: translateY(-1px); }

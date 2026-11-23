@@ -39,14 +39,14 @@ No terminal, na pasta onde foi feito o download:
 
 ```bash
 # Linux: AppImage
-chmod +x Reformato-1.0.0-linux-x64.AppImage
-./Reformato-1.0.0-linux-x64.AppImage
+chmod +x Reformato-1.0.1-linux-x64.AppImage
+./Reformato-1.0.1-linux-x64.AppImage
 
 # Debian, Ubuntu ou Zorin OS: pacote DEB
-sudo apt install ./reformato_1.0.0_amd64.deb
+sudo apt install ./reformato_1.0.1_amd64.deb
 ```
 
-Se o AppImage não abrir por falta de FUSE, use `./Reformato-1.0.0-linux-x64.AppImage --appimage-extract-and-run` ou escolha o pacote DEB em uma distribuição compatível.
+Se o AppImage não abrir por falta de FUSE, use `./Reformato-1.0.1-linux-x64.AppImage --appimage-extract-and-run` ou escolha o pacote DEB em uma distribuição compatível.
 
 ### Motor de conversão
 
@@ -60,6 +60,16 @@ Na primeira conversão de **áudio, vídeo ou BMP**, selecione **Baixar motor de
 4. **Converta.** Acompanhe cada item na fila e use **Abrir última pasta** para ver o resultado. Se o nome já estiver em uso, o Reformato acrescenta `(1)`, `(2)` e assim por diante.
 
 Na fila vazia, passe o mouse ou use **Tab** em **Imagem**, **Áudio** ou **Vídeo** para consultar as extensões. Em **Configurações**, escolha tema claro, escuro ou do sistema.
+
+### Vídeos grandes em computadores sem GPU
+
+Ao escolher **MP4** como saída de vídeo, selecione um modo:
+
+- **Automático (rápido):** para MOV, M4V e MKV que já contêm H.264 ou HEVC, tenta reaproveitar a faixa de vídeo sem recodificá-la. Se necessário, converte só o áudio para AAC. Se não der para reaproveitar o vídeo, recodifica para H.264.
+- **Compatível (H.264):** recodifica para H.264 sem reduzir a resolução. Use se o destino não reproduzir HEVC.
+- **Leve (até 720p):** usa menos threads e um preset rápido, mantendo a proporção e sem ampliar vídeos menores. Pode reduzir a resolução; não garante arquivos menores.
+
+O app mostra a etapa da conversão e, quando a duração é conhecida, o percentual. Nenhum dos modos exige uma placa de vídeo.
 
 ## Formatos compatíveis
 

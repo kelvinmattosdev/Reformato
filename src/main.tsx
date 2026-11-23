@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ArrowDownToLine, ArrowLeftRight, ArrowRight, Check, ChevronDown, CircleAlert, FileArchive, FileAudio, FileImage, FileVideo, FolderClosed, History, Layers, LoaderCircle, LockKeyhole, Monitor, Moon, Plus, RefreshCw, Settings2, Sun, X } from 'lucide-react'
-import type { Engine, Entry, ImportedFile, Progress, Update } from './desktop'
+import type { Engine, Entry, ImportedFile, Progress, Update, VideoProfile, VideoProgress } from './desktop'
 import mediaFormats from '../shared/media-formats.json'
 import './style.css'
 
 type Theme = 'system' | 'light' | 'dark'
-type Row = ImportedFile & { target: string; state: 'waiting' | Progress['state']; output?: string; error?: string }
+type Row = ImportedFile & { target: string; state: 'waiting' | Progress['state']; output?: string; error?: string | null; detail?: VideoProgress | null }
 type View = 'settings' | 'changelog' | 'fresh' | 'engine'
 const api = window.reformato
 const themes = [{ id: 'system', label: 'Sistema', Icon: Monitor }, { id: 'light', label: 'Claro', Icon: Sun }, { id: 'dark', label: 'Escuro', Icon: Moon }] as const
@@ -18,6 +18,29 @@ const groups = [
   { label: 'Vídeo', values: mediaExtensions(mediaFormats.video), Icon: FileVideo },
 ]
 const fileSize = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 })
+const profileHints: Record<VideoProfile, string> = {
+  automatic: 'Reaproveita H.264 ou HEVC quando possível, sem recodificar o vídeo.',
+  compatible: 'Recodifica para H.264 sem reduzir a resolução. Pode demorar mais.',
+  light: 'Usa um perfil rápido, menos threads e saída de até 720p.',
+}
+const videoSteps: Record<VideoProgress['phase'], string> = {
+  analyzing: 'Analisando vídeo',
+  copy: 'Reaproveitando vídeo e áudio',
+  copyVideo: 'Reaproveitando vídeo, convertendo áudio',
+  encode: 'Recodificando vídeo',
+  finalizing: 'Salvando arquivo',
+}
+
+function readVideoProfile(): VideoProfile {
+  const saved = localStorage.getItem('reformato-video-profile')
+  return saved === 'compatible' || saved === 'light' ? saved : 'automatic'
+}
+
+function durationLabel(seconds: number) {
+  const minutes = Math.floor(seconds / 60)
+  const rest = Math.floor(seconds % 60)
+  return `${minutes}:${String(rest).padStart(2, '0')}`
+}
 
 function sizeLabel(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -105,6 +128,7 @@ function App() {
   const [update, setUpdate] = useState<Update>({ state: 'idle' })
   const [engine, setEngine] = useState<Engine>({ state: 'missing' })
   const [running, setRunning] = useState(false)
+  const [videoProfile, setVideoProfile] = useState(readVideoProfile)
   const [dragging, setDragging] = useState(false)
   const [notice, setNotice] = useState('')
   const dragDepth = useRef(0)
@@ -148,6 +172,8 @@ function App() {
   const shared = waiting[0]?.target && waiting.every((row) => row.target === waiting[0].target) ? waiting[0].target : ''
   const completed = rows.filter((row) => row.state === 'done').length
   const failed = rows.filter((row) => row.state === 'error').length
+  const activeVideo = rows.find((row) => row.state === 'running')?.detail
+  const mp4Video = rows.some((row) => row.state !== 'done' && row.target === 'mp4' && groups[2].values.includes(row.format))
   const busy = running || update.state === 'downloading'
   const hasDestination = destination.trim().length > 0
 
@@ -192,7 +218,7 @@ function App() {
     setFolderError('')
     setRunning(true)
     try {
-      const result = await api.convert(waiting.map(({ id, target }) => ({ id, target })), destination)
+      const result = await api.convert(waiting.map(({ id, target }) => ({ id, target })), destination, videoProfile)
       if ('engineRequired' in result) setView('engine')
       else if ('error' in result) setFolderError(result.error)
       else setDestination(result.destination)
@@ -305,8 +331,8 @@ function App() {
                   <span title={row.error ?? row.output}>{row.error ?? row.output ?? `${row.format.toUpperCase()} · ${sizeLabel(row.size)}`}</span>
                 </div>
                 <FormatSelect value={row.target} formats={row.formats} disabled={busy || row.state === 'done'} label={`Formato de ${row.name}`} onChange={(value) => setTarget(row.id, value)} />
-                <span className={`row-status ${row.state}`} role="status">
-                  {row.state === 'error' ? <><CircleAlert size={15} />Falhou</> : row.state === 'done' ? <><Check size={16} />Pronto</> : row.state === 'running' ? <><LoaderCircle size={16} className="spin" />Convertendo</> : 'Na fila'}
+                 <span className={`row-status ${row.state}`} role="status">
+                  {row.state === 'error' ? <><CircleAlert size={15} />Falhou</> : row.state === 'done' ? <><Check size={16} />Pronto</> : row.state === 'running' ? <><LoaderCircle size={16} className="spin" />{row.detail?.percent === undefined ? 'Convertendo' : `${row.detail.percent}%`}</> : 'Na fila'}
                 </span>
                 <button className="icon-button remove" title="Remover arquivo" aria-label={`Remover ${row.name}`} disabled={busy} onClick={() => {
                   void api?.removeFile(row.id).then(() => setRows((current) => current.filter((item) => item.id !== row.id))).catch(() => setNotice('Não foi possível remover o arquivo.'))
@@ -330,6 +356,22 @@ function App() {
                 placeholder={!waiting.length ? 'Adicione arquivos' : !commonFormats.length ? 'Defina por arquivo' : 'Escolher formato'} />
               <p>Você também pode definir a saída de cada arquivo na fila.</p>
             </div>
+            {mp4Video && <div className="field">
+              <label htmlFor="video-profile">Modo de vídeo MP4</label>
+              <span className="select-wrap">
+                <select id="video-profile" value={videoProfile} disabled={busy} aria-describedby="video-profile-hint" onChange={(event) => {
+                  const profile = event.target.value as VideoProfile
+                  setVideoProfile(profile)
+                  localStorage.setItem('reformato-video-profile', profile)
+                }}>
+                  <option value="automatic">Automático (rápido)</option>
+                  <option value="compatible">Compatível (H.264)</option>
+                  <option value="light">Leve (até 720p)</option>
+                </select>
+                <ChevronDown size={14} aria-hidden="true" />
+              </span>
+              <p id="video-profile-hint">{profileHints[videoProfile]}</p>
+            </div>}
             <div className="field">
               <label htmlFor="output-folder">Pasta de saída</label>
               <div className="folder-field">
@@ -350,7 +392,17 @@ function App() {
                 {running ? <LoaderCircle size={18} className="spin" /> : <ArrowRight size={18} />}
                 {running ? 'Convertendo…' : 'Converter arquivos'}
               </button>
-              <span className="action-hint">{running ? 'Acompanhe o status na fila.' : !waiting.length ? 'Adicione arquivos para começar.' : !hasDestination ? 'Informe uma pasta para continuar.' : `${waiting.length} ${waiting.length === 1 ? 'arquivo pronto' : 'arquivos prontos'} para converter.`}</span>
+              {running && activeVideo
+                ? <div className="conversion-meter">
+                  <div><strong>{videoSteps[activeVideo.phase]}</strong>{activeVideo.percent !== undefined && <span>{activeVideo.percent}%</span>}</div>
+                  <progress aria-label="Progresso da conversão de vídeo" max={100} value={activeVideo.percent} />
+                  <small>{[
+                    activeVideo.elapsed !== undefined
+                      ? `${durationLabel(activeVideo.elapsed)}${activeVideo.total ? ` / ${durationLabel(activeVideo.total)}` : ''}` : '',
+                    activeVideo.speed ? `${fileSize.format(activeVideo.speed)}×` : '',
+                  ].filter(Boolean).join(' · ')}</small>
+                </div>
+                : <span className="action-hint">{running ? 'Acompanhe o status na fila.' : !waiting.length ? 'Adicione arquivos para começar.' : !hasDestination ? 'Informe uma pasta para continuar.' : `${waiting.length} ${waiting.length === 1 ? 'arquivo pronto' : 'arquivos prontos'} para converter.`}</span>}
             </div>
           </div>
         </aside>

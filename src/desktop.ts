@@ -1,6 +1,14 @@
 export type ImportedFile = { id: string; name: string; format: string; formats: string[]; size: number }
 export type Job = { id: string; target: string }
-export type Progress = { id: string; state: 'running' | 'done' | 'error'; error?: string; output?: string }
+export type VideoProfile = 'automatic' | 'compatible' | 'light'
+export type VideoProgress = {
+  phase: 'analyzing' | 'encode' | 'copy' | 'copyVideo' | 'finalizing'
+  percent?: number
+  elapsed?: number
+  total?: number
+  speed?: number
+}
+export type Progress = { id: string; state: 'running' | 'done' | 'error'; error?: string | null; output?: string; detail?: VideoProgress | null }
 export type Update = {
   state: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'latest' | 'manual' | 'error' | 'unpublished' | 'dev'
   version?: string
@@ -18,7 +26,7 @@ declare global {
       removeFile(id: string): Promise<void>
       chooseDestination(current: string): Promise<string | null>
       openDestination(): Promise<string>
-      convert(jobs: Job[], outputFolder: string): Promise<{ destination: string } | { error: string } | { engineRequired: true }>
+      convert(jobs: Job[], outputFolder: string, videoProfile: VideoProfile): Promise<{ destination: string } | { error: string } | { engineRequired: true }>
       onProgress(callback: (event: Progress) => void): () => void
       engineStatus(): Promise<Engine>
       installEngine(): Promise<Engine>

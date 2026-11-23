@@ -3,7 +3,7 @@ const { randomUUID } = require('node:crypto')
 const { stat, writeFile } = require('node:fs/promises')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
-const { convertFile, sourceFormat, formatsFor, needsFfmpeg, supported } = require('./conversion.cjs')
+const { convertFile, sourceFormat, formatsFor, needsFfmpeg, videoProfiles, supported } = require('./conversion.cjs')
 const { resolveDestination } = require('./destination.cjs')
 const { createEngine } = require('./engine.cjs')
 const { createUpdates, getChangelog } = require('./releases.cjs')
@@ -113,8 +113,9 @@ app.whenReady().then(async () => {
   handle('destination:open', async () => destination ? shell.openPath(destination) : '')
   handle('engine:status', engine.status)
   handle('engine:install', engine.install)
-  handle('conversion:start', async ({ jobs, outputFolder } = {}) => {
+  handle('conversion:start', async ({ jobs, outputFolder, videoProfile = 'automatic' } = {}) => {
     if (running || updates.status().state === 'downloading' || !Array.isArray(jobs) || !jobs.length || jobs.length > 1000) throw new Error('Fila inválida.')
+    if (!videoProfiles.includes(videoProfile)) throw new Error('Perfil de vídeo inválido.')
     const ids = new Set()
     for (const job of jobs) {
       const file = inputFiles.get(job?.id)
@@ -131,9 +132,12 @@ app.whenReady().then(async () => {
       if (requiresEngine && !executable) return { engineRequired: true }
       destination = folder
       for (const { id, target } of jobs) {
-        send('conversion:progress', { id, state: 'running' })
+        send('conversion:progress', { id, state: 'running', error: null, detail: null })
         try {
-          const output = await convertFile(inputFiles.get(id), target, folder, executable)
+          const output = await convertFile(inputFiles.get(id), target, folder, executable, {
+            videoProfile,
+            onProgress: (detail) => send('conversion:progress', { id, state: 'running', detail }),
+          })
           send('conversion:progress', { id, state: 'done', output })
         } catch (error) {
           const diagnostic = {
@@ -141,7 +145,8 @@ app.whenReady().then(async () => {
             EPERM: 'Sem permissão para ler o arquivo ou gravar na pasta de saída.',
             ENOSPC: 'Não há espaço suficiente na pasta de saída.',
             ENOENT: 'O arquivo ou a pasta de saída não existe mais.',
-          }[error.code]
+          }[error.code] ?? (/no space left/i.test(error.cause?.message ?? '')
+            ? 'Não há espaço suficiente na pasta de saída.' : undefined)
           const publicMessage = /^(O arquivo não tem|O conteúdo da imagem|Imagens animadas|Não foi possível (ler a mídia|iniciar o conversor|processar a imagem BMP))/.test(error.message)
           send('conversion:progress', { id, state: 'error', error: diagnostic || (publicMessage ? error.message : 'Não foi possível converter este arquivo.') })
         }

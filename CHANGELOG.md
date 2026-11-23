@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 1.0.1 — MP4 mais rápido sem placa de vídeo
+
+- Modo Automático reaproveita vídeo H.264 ou HEVC em MOV, M4V e MKV compatíveis, convertendo apenas o áudio quando necessário.
+- Novos modos Compatível (H.264 na resolução de entrada) e Leve (até 720p, com menos threads).
+- A fila informa quando está copiando, recodificando ou salvando e mostra o progresso quando a duração está disponível.
+- Preset H.264 mais rápido e prioridade reduzida para o FFmpeg, dando mais espaço a outros apps enquanto a fila roda.
+
 ## 1.0.0 — Primeira versão estável
 
 - Pacotes para Linux x64 (AppImage e DEB) e Windows x64 (instalador NSIS).
