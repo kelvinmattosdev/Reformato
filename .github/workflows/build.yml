@@ -1,0 +1,67 @@
+name: Build desktop
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: linux-x64
+            command: dist:linux
+          - os: windows-2025
+            name: windows-x64
+            command: dist:win
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run ${{ matrix.command }}
+      - if: runner.os == 'Linux'
+        name: Test packaged AppImage
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth
+          image=(release/*.AppImage)
+          package=(release/*.deb)
+          node scripts/verify-release.mjs release/latest-linux.yml
+          dpkg-deb --info "${package[0]}"
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a node scripts/smoke-release.cjs "${image[0]}"
+      - if: runner.os == 'Windows'
+        name: Install and test packaged app
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem release/Reformato-Setup-*.exe).FullName
+          $dest = Join-Path $env:RUNNER_TEMP ReformatoSmoke
+          node scripts/verify-release.mjs release/latest.yml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $process = Start-Process -FilePath $setup -ArgumentList '/S', "/D=$dest" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "NSIS failed with exit code $($process.ExitCode)" }
+          node scripts/smoke-release.cjs (Join-Path $dest Reformato.exe)
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/Reformato-Setup-*.exe
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+          compression-level: 0

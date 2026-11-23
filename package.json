@@ -1,0 +1,57 @@
+{
+  "name": "reformato",
+  "productName": "Reformato",
+  "desktopName": "reformato.desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Conversor de arquivos local e em lote para desktop.",
+  "author": {
+    "name": "Kelvin Mattos",
+    "email": "125149013+kelvinmattosdev@users.noreply.github.com"
+  },
+  "homepage": "https://github.com/kelvinmattosdev/Reformato",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kelvinmattosdev/Reformato.git"
+  },
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build && node scripts/icon.mjs",
+    "start": "npm run build && electron .",
+    "test": "node --test test/*.test.cjs",
+    "check": "npm test && npm run build",
+    "pack": "npm run build && electron-builder --dir --publish never",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb --x64 --publish never",
+    "dist:win": "npm run build && electron-builder --win nsis --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "45.4.1",
+    "electron-builder": "^26.18.0",
+    "ffmpeg-static": "5.3.0",
+    "playwright-core": "1.58.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1"
+  },
+  "build": {
+    "appId": "com.kelvinmattosdev.reformato",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "electron/**/*", "shared/**/*", "build/icon.png", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md", "package.json"],
+    "asarUnpack": ["node_modules/@img/**/*"],
+    "publish": { "provider": "github", "owner": "kelvinmattosdev", "repo": "Reformato" },
+    "linux": { "target": ["AppImage", "deb"], "category": "Utility", "icon": "build/icon.png", "syncDesktopName": true },
+    "appImage": { "artifactName": "Reformato-${version}-linux-x64.AppImage" },
+    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "nsis": { "artifactName": "Reformato-Setup-${version}-x64.exe", "oneClick": false }
+  }
+}

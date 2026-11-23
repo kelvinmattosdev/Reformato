@@ -1,0 +1,77 @@
+const { test } = require('node:test')
+const assert = require('node:assert/strict')
+const { mkdtemp, readFile, readdir, writeFile, rm } = require('node:fs/promises')
+const { tmpdir } = require('node:os')
+const path = require('node:path')
+const { execFileSync } = require('node:child_process')
+const sharp = require('sharp')
+const ffmpeg = require('ffmpeg-static')
+const { convertFile, sourceFormat, formatsFor } = require('../electron/conversion.cjs')
+
+async function fixture(t) {
+  const folder = await mkdtemp(path.join(tmpdir(), 'reformato-test-'))
+  t.after(() => rm(folder, { recursive: true, force: true }))
+  return folder
+}
+
+test('lists only compatible targets and normalizes JPEG and uppercase', () => {
+  assert.equal(sourceFormat('/tmp/FOTO.JPEG'), 'jpg')
+  assert.equal(sourceFormat('/tmp/FOTO.TIF'), 'tiff')
+  assert.deepEqual(formatsFor('jpg'), ['png', 'webp', 'avif', 'bmp', 'tiff', 'tif', 'gif'])
+  assert.deepEqual(formatsFor('webp'), ['png', 'jpg'])
+  assert.ok(!formatsFor('avif').includes('webp'))
+  assert.ok(formatsFor('wav').includes('mp4'))
+  assert.ok(formatsFor('mp4').includes('mp3'))
+  assert.deepEqual(formatsFor('svg'), [])
+  assert.ok(!formatsFor('webp').includes('svg'))
+})
+
+test('converts an image, flattens transparency for JPG and never overwrites', async (t) => {
+  const folder = await fixture(t)
+  const source = path.join(folder, 'amostra.PNG')
+  await sharp({ create: { width: 20, height: 10, channels: 4, background: '#ab234500' } }).png().toFile(source)
+  const original = await readFile(source)
+  await writeFile(path.join(folder, 'amostra.jpg'), 'preservar')
+  assert.equal(await convertFile(source, 'jpg', folder), 'amostra (1).jpg')
+  assert.equal(await convertFile(source, 'webp', folder), 'amostra.webp')
+  const { format, width, height, hasAlpha } = await sharp(path.join(folder, 'amostra (1).jpg')).metadata()
+  assert.deepEqual({ format, width, height, hasAlpha }, { format: 'jpeg', width: 20, height: 10, hasAlpha: false })
+  assert.equal(await readFile(path.join(folder, 'amostra.jpg'), 'utf8'), 'preservar')
+  assert.deepEqual(await readFile(source), original)
+})
+
+test('rejects mislabeled files, cleans temporary files and still converts subsequent input', async (t) => {
+  const folder = await fixture(t)
+  const source = path.join(folder, 'falso.png')
+  await sharp({ create: { width: 12, height: 12, channels: 3, background: '#ffffff' } }).jpeg().toFile(source)
+  await assert.rejects(convertFile(source, 'jpg', folder), /não corresponde/)
+  await assert.rejects(convertFile(source, 'svg', folder), /não disponível/)
+  assert.deepEqual(await readdir(folder), ['falso.png'])
+})
+
+test('rejects an animated GIF instead of silently flattening it', async (t) => {
+  const folder = await fixture(t)
+  const gif = path.join(folder, 'animado.gif')
+  execFileSync(ffmpeg, ['-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc=size=24x16:rate=4:duration=1', '-threads', '2', gif])
+  assert.ok((await sharp(gif).metadata()).pages > 1)
+  await assert.rejects(convertFile(gif, 'png', folder), /Imagens animadas/)
+  assert.deepEqual(await readdir(folder), ['animado.gif'])
+})
+
+test('converts WAV to audio-only MP4 and encodes video to WebM', async (t) => {
+  const folder = await fixture(t)
+  const wav = path.join(folder, 'som.wav')
+  const sourceVideo = path.join(folder, 'clip.mov')
+  execFileSync(ffmpeg, ['-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=0.25', wav])
+  execFileSync(ffmpeg, ['-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=black:s=48x32:d=0.24', '-c:v', 'libx264', sourceVideo])
+  assert.equal(await convertFile(wav, 'mp3', folder), 'som.mp3')
+  assert.equal(await convertFile(wav, 'mp4', folder), 'som.mp4')
+  const container = await readFile(path.join(folder, 'som.mp4'))
+  assert.equal(container.subarray(4, 8).toString(), 'ftyp')
+  assert.equal(await convertFile(sourceVideo, 'webm', folder), 'clip.webm')
+  assert.equal((await readFile(path.join(folder, 'clip.webm'))).subarray(0, 4).toString('hex'), '1a45dfa3')
+  await assert.rejects(convertFile(sourceVideo, 'mp3', folder), /não tem a faixa/)
+  const audioOnlyMp4 = path.join(folder, 'som.mp4')
+  assert.equal(await convertFile(audioOnlyMp4, 'mp3', folder), 'som (1).mp3')
+  await assert.rejects(convertFile(audioOnlyMp4, 'webm', folder), /não tem a faixa/)
+})
