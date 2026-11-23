@@ -171,7 +171,14 @@ async function convertFile(input, target, destination, executable) {
   const output = path.join(temporary, `saida.${target}`)
   try {
     if (images.includes(source)) await encodeImage(input, source, target, output, executable)
-    else await encodeMedia(input, source, target, output, executable)
+    else if (process.platform === 'win32' && source === 'tta' &&
+      (target === 'mp4' || media.audio[canonical(target)]?.codec === 'aac')) {
+      // FFmpeg 6 no Windows não aceita a mudança de layout de alguns fluxos TTA no filtro AAC.
+      const pcm = path.join(temporary, 'entrada.wav')
+      await runFfmpeg(['-f', 'tta', '-i', input, '-map', '0:a:0', '-c:a', 'pcm_s32le',
+        '-map_metadata', '-1', '-f', 'wav', pcm], () => 'Não foi possível ler a mídia.', executable)
+      await encodeMedia(pcm, 'wav', target, output, executable)
+    } else await encodeMedia(input, source, target, output, executable)
     return await saveWithoutOverwrite(output, destination, path.parse(input).name, target)
   } finally {
     await rm(temporary, { recursive: true, force: true, maxRetries: 3 }).catch(() => {})
